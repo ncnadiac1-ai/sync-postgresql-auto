@@ -5,33 +5,44 @@ import gspread
 from google.oauth2.service_account import Credentials
 from sqlalchemy import create_engine, text
 
-# Leer JSON desde variable de entorno
+# Autenticación con Google Sheets
 sa_info = json.loads(os.environ["GOOGLE_SHEETS_JSON"])
 scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive"
 ]
 credentials = Credentials.from_service_account_info(sa_info, scopes=scopes)
 gc = gspread.authorize(credentials)
 
-# Leer Google Sheet
+# AbrE el archivo de Sheets
 spreadsheet = gc.open("Trabajo Final NC2025")
-hoja = spreadsheet.sheet1
-datos = hoja.get_all_records()
-df = pd.DataFrame(datos)
 
-# Conectar a PostgreSQL (Railway)
-usuario = os.environ["PG_USER"]
-contraseña = os.environ["PG_PASSWORD"]
-host = os.environ["PG_HOST"]
-puerto = os.environ["PG_PORT"]
-database = os.environ["PG_DATABASE"]
+# Conecta a PostgreSQL
+engine = create_engine(
+    f"postgresql://{os.environ['PG_USER']}:{os.environ['PG_PASSWORD']}@{os.environ['PG_HOST']}:{os.environ['PG_PORT']}/{os.environ['PG_DATABASE']}"
+)
 
-engine = create_engine(f"postgresql://{usuario}:{contraseña}@{host}:{puerto}/{database}")
+# Recorre todas las hojas del archivo
+for hoja in spreadsheet.worksheets():
+    nombre_hoja = hoja.title.lower().replace(" ", "_")
+    print(f"⏳ Procesando hoja: {nombre_hoja}")
 
-# Subir datos a tabla (ajustar nombre si necesario)
-df.to_sql('clientes', engine, if_exists='replace', index=False)
+    # Lee los datos
+    datos = hoja.get_all_records()
+    df = pd.DataFrame(datos)
 
+    if df.empty:
+        print(f" Hoja {nombre_hoja} está vacía. Saltando...")
+        continue
+
+    # Asegura nombres de columnas válidos
+    df.columns = [col if col.strip() != '' else f'col_{i}' for i, col in enumerate(df.columns)]
+
+    # Subi a PostgreSQL
+    df.to_sql(nombre_hoja, engine, if_exists="replace", index=False)
+    print(f"✅ Hoja {nombre_hoja} cargada correctamente.")
+
+# Verificación final
 with engine.connect() as conn:
     version = conn.execute(text("SELECT version();")).fetchone()
     print("✅ Conectado a PostgreSQL:", version)
