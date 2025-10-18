@@ -4,6 +4,7 @@ import time
 import pandas as pd
 import gspread
 import psycopg2
+import re
 from google.oauth2.service_account import Credentials
 from sqlalchemy import create_engine, text
 
@@ -65,7 +66,27 @@ for hoja in spreadsheet.worksheets():
         col.strip().lower().replace(" ", "_") if col.strip() != "" else f"col_{i}"
         for i, col in enumerate(df.columns)
     ]
-        
+     # Normalización de columnas numéricas (ACÁ va tu función)
+
+
+    def normalizar_numero(valor):
+        if isinstance(valor, str):
+          # Quita espacios y símbolos de moneda
+           valor = valor.strip().replace('$', '').replace(' ', '')
+          # Cambia formato argentino por anglosajón: "1.234,56" -> "1234.56"
+           valor = re.sub(r'\.(?=\d{3}(,|$))', '', valor)  # elimina puntos de miles
+           valor = valor.replace(',', '.')  # cambia coma por punto decimal
+           try:
+                return float(valor)
+           except ValueError:
+              return None
+    return valor
+
+# Aplica a todas las columnas de tipo texto
+    for col in df.columns:
+        if df[col].dtype == object:
+           df[col] = df[col].apply(normalizar_numero)
+   
     # Sube la hoja a PostgreSQL
     df.to_sql(nombre_hoja, engine, if_exists="replace", index=False)
     print(f"✅ Hoja '{nombre_hoja}' cargada correctamente en PostgreSQL.")
