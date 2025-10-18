@@ -1,11 +1,46 @@
 import os
 import json
+import re
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from sqlalchemy import create_engine, text
 
-# Autenticación con Google Sheets
+# -------------------------------
+# 🔹 Función para normalizar números en formato argentino
+# -------------------------------
+def normalizar_numero(valor):
+    if valor is None or valor == '':
+        return None
+
+    valor_str = str(valor).strip().replace('$', '').replace(' ', '')
+
+    # Formato argentino 46.800,00 → 46800.00
+    if re.match(r'^\d{1,3}(\.\d{3})*(,\d+)?$', valor_str):
+        valor_str = valor_str.replace('.', '').replace(',', '.')
+
+    # Solo coma como decimal: 2000,00 → 2000.00
+    elif re.match(r'^\d+(,\d+)?$', valor_str):
+        valor_str = valor_str.replace(',', '.')
+
+    # Formato inglés con coma como miles: 2,000.00 → 2000.00
+    elif re.match(r'^\d{1,3}(,\d{3})*(\.\d+)?$', valor_str):
+        valor_str = valor_str.replace(',', '')
+
+    try:
+        num = float(valor_str)
+
+        # Corrige casos truncados como 46.8 que deberían ser 46800
+        if num < 100 and '.' in valor_str and len(valor_str.split('.')[0]) <= 2 and len(valor_str.split('.')[-1]) <= 2:
+            num *= 1000
+
+        return num
+    except ValueError:
+        return None
+
+# -------------------------------
+# 🔹 Autenticación Google Sheets
+# -------------------------------
 sa_info = json.loads(os.environ["GOOGLE_SHEETS_JSON"])
 scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -14,35 +49,53 @@ scopes = [
 credentials = Credentials.from_service_account_info(sa_info, scopes=scopes)
 gc = gspread.authorize(credentials)
 
-# AbrE el archivo de Sheets
-spreadsheet = gc.open("Trabajo Final NC2025")
-
-# Conecta a PostgreSQL
+# -------------------------------
+# 🔹 Conexión a PostgreSQL
+# -------------------------------
 engine = create_engine(
     f"postgresql://{os.environ['PG_USER']}:{os.environ['PG_PASSWORD']}@{os.environ['PG_HOST']}:{os.environ['PG_PORT']}/{os.environ['PG_DATABASE']}"
 )
 
-# Recorre todas las hojas del archivo
+# -------------------------------
+# 🔹 Procesamiento de hojas
+# -------------------------------
+spreadsheet = gc.open("Trabajo Final NC2025")
+
 for hoja in spreadsheet.worksheets():
     nombre_hoja = hoja.title.lower().replace(" ", "_")
-    print(f"⏳ Procesando hoja: {nombre_hoja}")
+    print(f"\n⏳ Procesando hoja: {nombre_hoja}")
 
-    # Lee los datos
     datos = hoja.get_all_records()
     df = pd.DataFrame(datos)
 
     if df.empty:
-        print(f" Hoja {nombre_hoja} está vacía. Saltando...")
+        print(f"⚠️ Hoja '{nombre_hoja}' vacía. Saltando...")
         continue
 
-    # Asegura nombres de columnas válidos
-    df.columns = [col if col.strip() != '' else f'col_{i}' for i, col in enumerate(df.columns)]
+    # Nombres válidos de columnas
+    df.columns = [
+        col.strip().lower().replace(" ", "_") if col.strip() != '' else f'col_{i}'
+        for i, col in enumerate(df.columns)
+    ]
 
-    # Subi a PostgreSQL
+    # Detecta columnas numéricas por nombre
+    columnas_numericas = [
+        col for col in df.columns
+        if any(palabra in col for palabra in ["importe", "costo", "precio", "monto", "efectivo", "valor", "total", "saldo"])
+    ]
+
+    # Normaliza y convierte a float
+    for col in columnas_numericas:
+        df[col] = df[col].apply(normalizar_numero)
+        df[col] = pd.to_numeric(df[col], errors='coerce')  # fuerza tipo float
+
+    # Carga en PostgreSQL
     df.to_sql(nombre_hoja, engine, if_exists="replace", index=False)
-    print(f"✅ Hoja {nombre_hoja} cargada correctamente.")
+    print(f"✅ Hoja '{nombre_hoja}' cargada correctamente con {len(df)} filas.")
 
-# Verificación final
+# -------------------------------
+# 🔹 Verificación final
+# -------------------------------
 with engine.connect() as conn:
     version = conn.execute(text("SELECT version();")).fetchone()
-    print("✅ Conectado a PostgreSQL:", version)
+    print("🧠 Conectado a PostgreSQL:", version[0])
