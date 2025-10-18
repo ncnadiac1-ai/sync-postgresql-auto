@@ -8,16 +8,27 @@ import psycopg2
 from google.oauth2.service_account import Credentials
 from sqlalchemy import create_engine, text
 
-# 🔹 Función segura para normalizar números en formato argentino
 def normalizar_numero(valor):
-    if isinstance(valor, str) and "," in valor:
+    # Si es float o int, no tocarlo (ya viene correcto)
+    if isinstance(valor, (int, float)):
+        return valor
+
+    # Si es texto, intentar normalizar formato argentino
+    if isinstance(valor, str):
         valor = valor.strip().replace('$', '').replace(' ', '')
-        valor = re.sub(r'\.(?=\d{3}(,|$))', '', valor)
-        valor = valor.replace(',', '.')
+
+        # Si tiene miles con punto (2.000,00)
+        if re.match(r'^\d{1,3}(\.\d{3})*(,\d+)?$', valor):
+            valor = valor.replace('.', '').replace(',', '.')
+        # Si tiene solo coma decimal (2000,00)
+        elif ',' in valor and '.' not in valor:
+            valor = valor.replace(',', '.')
+
         try:
             return float(valor)
         except ValueError:
             return valor  # deja el original si falla
+
     return valor
 
 # 🔹 Conexión a PostgreSQL
