@@ -8,7 +8,7 @@ from google.oauth2.service_account import Credentials
 from sqlalchemy import create_engine, text
 
 # ==============================
-# 1️⃣ Conexión con PostgreSQL (con reintento automático)
+# Conexión con PostgreSQL con reintento automático
 # ==============================
 PG_URI = (
     f"postgresql://{os.environ['PG_USER']}:{os.environ['PG_PASSWORD']}"
@@ -28,7 +28,7 @@ else:
     raise ConnectionError("No se pudo conectar a PostgreSQL después de 3 intentos.")
 
 # ==============================
-# 2️⃣ Autenticación con Google Sheets
+# Autenticación con Google Sheets
 # ==============================
 sa_info = json.loads(os.environ["GOOGLE_SHEETS_JSON"])
 scopes = [
@@ -39,14 +39,14 @@ credentials = Credentials.from_service_account_info(sa_info, scopes=scopes)
 gc = gspread.authorize(credentials)
 
 # ==============================
-# 3️⃣ Apertura del archivo de Sheets
+# Apertura del archivo de Sheets
 # ==============================
 spreadsheet_name = "Trabajo Final NC2025"
 spreadsheet = gc.open(spreadsheet_name)
 print(f"📄 Conectado correctamente al archivo: {spreadsheet_name}")
 
 # ==============================
-# 4️⃣ Carga de cada hoja en PostgreSQL
+# Carga de cada hoja en PostgreSQL
 # ==============================
 for hoja in spreadsheet.worksheets():
     nombre_hoja = hoja.title.lower().replace(" ", "_")
@@ -65,7 +65,7 @@ for hoja in spreadsheet.worksheets():
         col.strip().lower().replace(" ", "_") if col.strip() != "" else f"col_{i}"
         for i, col in enumerate(df.columns)
     ]
-    # Normalización de columnas numéricas (colocar acá)
+    # Normalización de columnas numéricas
 for col in df.columns:
     if df[col].dtype == object:
         # Limpia puntos de miles y reemplaza coma por punto decimal
@@ -79,7 +79,7 @@ for col in df.columns:
     print(f"✅ Hoja '{nombre_hoja}' cargada correctamente en PostgreSQL.")
 
 # ==============================
-# 5️⃣ Verificación final
+# Verificación final
 # ==============================
 with engine.connect() as conn:
     version = conn.execute(text("SELECT version();")).fetchone()
