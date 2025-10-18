@@ -65,7 +65,15 @@ for hoja in spreadsheet.worksheets():
         col.strip().lower().replace(" ", "_") if col.strip() != "" else f"col_{i}"
         for i, col in enumerate(df.columns)
     ]
-
+    # Normalización de columnas numéricas (colocar acá)
+for col in df.columns:
+    if df[col].dtype == object:
+        # Limpia puntos de miles y reemplaza coma por punto decimal
+        df[col] = df[col].astype(str).str.replace('.', '', regex=False)
+        df[col] = df[col].str.replace(',', '.', regex=False)
+        # Convierte a número si aplica
+        df[col] = pd.to_numeric(df[col], errors='ignore')
+        
     # Sube la hoja a PostgreSQL
     df.to_sql(nombre_hoja, engine, if_exists="replace", index=False)
     print(f"✅ Hoja '{nombre_hoja}' cargada correctamente en PostgreSQL.")
