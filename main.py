@@ -12,34 +12,15 @@ from sqlalchemy import create_engine, text
 # Función para normalizar formato de argentina
 # ========================================
 def normalizar_numero(valor):
-    """
-    Convierte valores numéricos o textuales con formato argentino (1.234,56)
-    a formato estándar (1234.56). Devuelve float o el valor original.
-    """
-    if pd.isna(valor):
-        return None
-
-    # Si ya es número, lo devolvemos sin cambios
-    if isinstance(valor, (int, float)):
-        return float(valor)
-
-    # Convierte a string y limpia
-    valor = str(valor).strip().replace('$', '').replace(' ', '')
-
-    # Corrige casos con punto de miles y coma decimal
-    # Ej: "2.000,00" → "2000.00", "1.234" → "1234"
-    if re.match(r'^\d{1,3}(\.\d{3})*(,\d+)?$', valor):
-        valor = valor.replace('.', '').replace(',', '.')
-    elif re.match(r'^\d{1,3}(,\d{3})*(\.\d+)?$', valor):
-        valor = valor.replace(',', '')  # casos anglosajones tipo 1,234.56
-
-    # Último intento de conversión
-    try:
-        return float(valor)
-    except ValueError:
-        return valor
-
-
+    if isinstance(valor, str):
+        valor = valor.strip().replace('$', '').replace(' ', '')
+        valor = re.sub(r'\.(?=\d{3}(,|$))', '', valor)  # quita puntos de miles
+        valor = valor.replace(',', '.')  # cambia coma por punto decimal
+        try:
+            return float(valor)
+        except ValueError:
+            return valor
+    return valor  # si ya es número, lo deja como está
 # ========================================
 # Conexión a PostgreSQL
 # ========================================
