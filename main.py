@@ -9,27 +9,37 @@ from google.oauth2.service_account import Credentials
 from sqlalchemy import create_engine, text
 
 def normalizar_numero(valor):
-    # Si es float o int, no tocarlo (ya viene correcto)
-    if isinstance(valor, (int, float)):
-        return valor
+    """
+    Convierte formatos argentinos como '46.800,00' en float correcto 46800.00
+    y corrige valores float mal interpretados (como 46.8).
+    """
+    if valor is None or valor == '':
+        return None
 
-    # Si es texto, intentar normalizar formato argentino
-    if isinstance(valor, str):
-        valor = valor.strip().replace('$', '').replace(' ', '')
+    # Fuerza a string (incluso si vino como float)
+    valor_str = str(valor).strip().replace('$', '').replace(' ', '')
 
-        # Si tiene miles con punto (2.000,00)
-        if re.match(r'^\d{1,3}(\.\d{3})*(,\d+)?$', valor):
-            valor = valor.replace('.', '').replace(',', '.')
-        # Si tiene solo coma decimal (2000,00)
-        elif ',' in valor and '.' not in valor:
-            valor = valor.replace(',', '.')
+    # Si tiene formato argentino con separador de miles
+    if re.match(r'^\d{1,3}(\.\d{3})*(,\d+)?$', valor_str):
+        valor_str = valor_str.replace('.', '').replace(',', '.')
 
-        try:
-            return float(valor)
-        except ValueError:
-            return valor  # deja el original si falla
+    # Si tiene coma decimal sin miles
+    elif re.match(r'^\d+(,\d+)?$', valor_str):
+        valor_str = valor_str.replace(',', '.')
 
-    return valor
+    # Si tiene formato inglés (2,000.00)
+    elif re.match(r'^\d{1,3}(,\d{3})*(\.\d+)?$', valor_str):
+        valor_str = valor_str.replace(',', '')
+
+    try:
+        num = float(valor_str)
+        # 🔹 Corrección adicional: si el número parece ser 46.8 pero debería ser 46800
+        # (por tener menos de 3 cifras antes del punto y decimales = 1 o 2)
+        if num < 100 and '.' in valor_str and len(valor_str.split('.')[0]) <= 2 and len(valor_str.split('.')[-1]) <= 2:
+            num *= 1000
+        return num
+    except ValueError:
+        return None
 
 # 🔹 Conexión a PostgreSQL
 PG_URI = (
