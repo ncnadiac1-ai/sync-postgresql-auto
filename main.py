@@ -55,6 +55,13 @@ gc = gspread.authorize(credentials)
 engine = create_engine(
     f"postgresql://{os.environ['PG_USER']}:{os.environ['PG_PASSWORD']}@{os.environ['PG_HOST']}:{os.environ['PG_PORT']}/{os.environ['PG_DATABASE']}"
 )
+# 🔍 Test de conexión temprana para despertar Railway
+try:
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT 1")).fetchone()
+        print("🚀 Railway PostgreSQL está activo. Resultado:", result[0])
+except Exception as e:
+    print("❌ Error al conectar con PostgreSQL:", e)
 
 # -------------------------------
 # 🔹 Procesamiento de hojas
