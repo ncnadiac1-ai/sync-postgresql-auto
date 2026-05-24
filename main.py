@@ -12,29 +12,25 @@ from sqlalchemy import create_engine, text
 def normalizar_numero(valor):
     if valor is None or valor == '':
         return None
-
+    
+    # Si ya es número entero o float, devolverlo directo
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    
     valor_str = str(valor).strip().replace('$', '').replace(' ', '')
-
-    # Formato argentino 46.800,00 → 46800.00
+    
+    # Formato argentino: 310.000,00 → 310000.00
     if re.match(r'^\d{1,3}(\.\d{3})*(,\d+)?$', valor_str):
         valor_str = valor_str.replace('.', '').replace(',', '.')
-
-    # Solo coma como decimal: 2000,00 → 2000.00
+    # Solo coma decimal: 2000,00 → 2000.00
     elif re.match(r'^\d+(,\d+)?$', valor_str):
         valor_str = valor_str.replace(',', '.')
-
-    # Formato inglés con coma como miles: 2,000.00 → 2000.00
+    # Formato inglés: 2,000.00 → 2000.00
     elif re.match(r'^\d{1,3}(,\d{3})*(\.\d+)?$', valor_str):
         valor_str = valor_str.replace(',', '')
-
+    
     try:
-        num = float(valor_str)
-
-        # Corrige casos truncados como 46.8 que deberían ser 46800
-        if num < 100 and '.' in valor_str and len(valor_str.split('.')[0]) <= 2 and len(valor_str.split('.')[-1]) <= 2:
-            num *= 1000
-
-        return num
+        return float(valor_str)
     except ValueError:
         return None
 
