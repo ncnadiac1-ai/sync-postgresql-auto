@@ -91,10 +91,11 @@ for hoja in spreadsheet.worksheets():
         if any(palabra in col for palabra in ["importe", "costo", "precio", "monto", "efectivo", "valor", "total", "saldo"])
     ]
 
-    # Normaliza y convierte a float
+  # Normaliza y convierte a float
     for col in columnas_numericas:
+        print(f"Valores crudos de {col}:", df[col].head(10).tolist())
         df[col] = df[col].apply(normalizar_numero)
-        df[col] = pd.to_numeric(df[col], errors='coerce')  # fuerza tipo float
+        print(f"Valores normalizados de {col}:", df[col].head(10).tolist())
 
     # Carga en PostgreSQL
     df.to_sql(nombre_hoja, engine, if_exists="replace", index=False)
