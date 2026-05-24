@@ -13,10 +13,6 @@ def normalizar_numero(valor):
     if valor is None or valor == '':
         return None
     
-    # Si ya es número entero o float, devolverlo directo
-    if isinstance(valor, (int, float)):
-        return float(valor)
-    
     valor_str = str(valor).strip().replace('$', '').replace(' ', '')
     
     # Formato argentino: 310.000,00 → 310000.00
@@ -33,7 +29,6 @@ def normalizar_numero(valor):
         return float(valor_str)
     except ValueError:
         return None
-
 # -------------------------------
 # 🔹 Autenticación Google Sheets
 # -------------------------------
@@ -68,7 +63,7 @@ for hoja in spreadsheet.worksheets():
     nombre_hoja = hoja.title.lower().replace(" ", "_")
     print(f"\n⏳ Procesando hoja: {nombre_hoja}")
 
-    datos = hoja.get_all_records()
+    datos = hoja.get_all_records(value_render_option='FORMATTED_VALUE')
     df = pd.DataFrame(datos)
 
     if df.empty:
